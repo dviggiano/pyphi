@@ -166,21 +166,20 @@ class Option:
                     )
                 )
             elif self.type is Mapping:
-                # Collect all missing or incorrect key-value pairs from configuration.
+                # Collect all missing key-value pairs from configuration.
                 # If any, throw error indicating all missing pairs.
                 missing = []
-                for key, val in self.default.items():
-                    if key not in value or not isinstance(value[key], type(val)):
-                        missing.append((key, type(val)))
+                for k, v in self.default.items():
+                    if k not in value or not isinstance(value[k], type(v)):
+                        missing.append((k, type(v)))
                 if missing:
                     raise ConfigurationError(
                         "{} option must contain {{{}}}; only got {}".format(
                             self.name,
-                            ", ".join(["'{}': {}".format(pair[0], pair[1]) for pair in missing]),
+                            ", ".join(["'{}': {}".format(k, v) for k, v in missing]),
                             value
                         )
                     )
-                    
         if self.values and value not in self.values:
             raise ConfigurationError(
                 "{} ({}) is not a valid value for {}; must be one of:\n    {}".format(
