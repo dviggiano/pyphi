@@ -157,8 +157,38 @@ def test_reconfigure_logging_on_change(capsys):
     [
         ("SYSTEM_CUTS", ["3.0_STYLE", "CONCEPT_STYLE"], ["OTHER"]),
         ("REPR_VERBOSITY", [0, 1, 2], [-1, 3]),
-        ("PARALLEL_CUT_EVALUATION", [True, False], ["True", "False", "no", 0, 1]),
         ("LOG_FILE", ["filename", Path("filename")], [0, 1]),
+        ("PARALLEL_CUT_EVALUATION",
+            [
+                dict(
+                    parallel=True,
+                    sequential_threshold=2**10,
+                    chunksize=2**12,
+                    progress=True,
+                ),
+                dict(
+                    parallel=False,
+                    sequential_threshold=2**9,
+                    chunksize=2**10,
+                    progress=False,
+                )
+            ],
+            [
+                dict(
+                    parallel=True,
+                ),
+                dict(
+                    parallel=False,
+                    sequential_threshold=2**9,
+                    progress=False,
+                ),
+                dict(
+                    val=False,
+                ),
+                True,
+                False
+            ]
+        ),
     ],
 )
 def test_config_validation(name, valid, invalid):

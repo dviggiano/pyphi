@@ -158,12 +158,22 @@ class Option:
 
     def _validate(self, value):
         """Validate the new value."""
-        if self.type is not None and not isinstance(value, self.type):
-            raise ConfigurationError(
-                "{} must be of type {} for {}; got {}".format(
-                    value, self.type, self.name, type(value)
+        if self.type is not None:
+            if not isinstance(value, self.type):
+                raise ConfigurationError(
+                    "{} must be of type {} for {}; got {}".format(
+                        value, self.type, self.name, type(value)
+                    )
                 )
-            )
+            elif self.type is Mapping:
+                for key, val in self.default.items():
+                    if key not in value or not isinstance(value[key], type(val)):
+                        raise ConfigurationError(
+                            "{} must contain key {} of type {} for {}".format(
+                                value, key, type(val), self.name
+                            )
+                        )
+                    
         if self.values and value not in self.values:
             raise ConfigurationError(
                 "{} ({}) is not a valid value for {}; must be one of:\n    {}".format(
