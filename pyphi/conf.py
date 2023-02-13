@@ -166,13 +166,20 @@ class Option:
                     )
                 )
             elif self.type is Mapping:
+                missing = []
                 for key, val in self.default.items():
                     if key not in value or not isinstance(value[key], type(val)):
-                        raise ConfigurationError(
-                            "{} option must contain key {} of type {}; got {}".format(
-                                self.name, key, type(val), value
-                            )
+                        missing.append((key, type(val)))
+                if missing:
+                    pairs = "{" 
+                    for i, pair in enumerate(missing):
+                        pairs += f"{pair[0]}: {pair[1]}"
+                        pairs += ", " if i + 1 < len(missing) else "}"    
+                    raise ConfigurationError(
+                        "{} option must contain {}; only got {}".format(
+                            self.name, pairs, value
                         )
+                    )
                     
         if self.values and value not in self.values:
             raise ConfigurationError(
