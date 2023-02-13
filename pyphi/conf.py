@@ -168,10 +168,10 @@ class Option:
             elif self.type is Mapping:
                 # Collect all missing key-value pairs from configuration.
                 # If any, throw error indicating all missing pairs.
-                missing = []
-                for k, v in self.default.items():
-                    if k not in value or not isinstance(value[k], type(v)):
-                        missing.append((k, type(v)))
+                missing = [
+                    (k, type(v)) for k, v in self.default.items()
+                    if k not in value or not isinstance(value[k], type(v))
+                ]
                 if missing:
                     raise ConfigurationError(
                         "{} option must contain {{{}}}; only got {}".format(
