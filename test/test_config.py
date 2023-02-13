@@ -168,14 +168,19 @@ def test_reconfigure_logging_on_change(capsys):
                 ),
                 dict(
                     parallel=False,
-                    sequential_threshold=2**9,
-                    chunksize=2**10,
                     progress=False,
+                ),
+                dict(
+                    sequential_threshold=2**10,
                 )
             ],
             [
                 dict(
+                    parallel=True,
                     val=False,
+                ),
+                dict(
+                    val=23,
                 ),
                 True,
                 False
