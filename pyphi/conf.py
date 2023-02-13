@@ -169,8 +169,8 @@ class Option:
                 for key, val in self.default.items():
                     if key not in value or not isinstance(value[key], type(val)):
                         raise ConfigurationError(
-                            "{} must contain key {} of type {} for {}".format(
-                                value, key, type(val), self.name
+                            "{} option must contain key {} of type {}; got {}".format(
+                                self.name, key, type(val), value
                             )
                         )
                     
