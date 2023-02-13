@@ -690,5 +690,6 @@ def repertoire_distance(r1, r2, direction=None, repertoire_distance=None, **kwar
         except TypeError:
             distance = func(r1, r2, **kwargs)
     except TypeError:
+        print(func)
         distance = func(r1, r2, direction=direction)
     return round(distance, config.PRECISION)
