@@ -173,14 +173,11 @@ class Option:
                     if key not in value or not isinstance(value[key], type(val)):
                         missing.append((key, type(val)))
                 if missing:
-                    pairs = "{" 
-                    for i, pair in enumerate(missing):
-                        pairs += "{}: {}".format(
-                            pair[0], pair[1], ", " if i + 1 < len(missing) else "}"
-                        ) 
                     raise ConfigurationError(
-                        "{} option must contain {}; only got {}".format(
-                            self.name, pairs, value
+                        "{} option must contain {{{}}}; only got {}".format(
+                            self.name,
+                            ", ".join(["'{}': {}".format(pair[0], pair[1]) for pair in missing]),
+                            value
                         )
                     )
                     
