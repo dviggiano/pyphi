@@ -166,6 +166,8 @@ class Option:
                     )
                 )
             elif self.type is Mapping:
+                # Collect all missing key-value pairs from configuration.
+                # If any, throw error indicating all missing pairs.
                 missing = []
                 for key, val in self.default.items():
                     if key not in value or not isinstance(value[key], type(val)):
