@@ -175,8 +175,9 @@ class Option:
                 if missing:
                     pairs = "{" 
                     for i, pair in enumerate(missing):
-                        pairs += f"{pair[0]}: {pair[1]}"
-                        pairs += ", " if i + 1 < len(missing) else "}"    
+                        pairs += "{}: {}".format(
+                            pair[0], pair[1], ", " if i + 1 < len(missing) else "}"
+                        ) 
                     raise ConfigurationError(
                         "{} option must contain {}; only got {}".format(
                             self.name, pairs, value
