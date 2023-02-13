@@ -3,45 +3,28 @@
 """
 Configuring PyPhi
 ~~~~~~~~~~~~~~~~~
-
 Various aspects of PyPhi's behavior can be configured.
-
 When PyPhi is imported, it checks for a YAML file named ``pyphi_config.yml`` in
 the current directory and automatically loads it if it exists; otherwise the
 default configuration is used.
-
 .. only:: never
-
     This py.test fixture resets PyPhi config back to defaults after running
     this doctest. This will not be shown in the output markup.
-
     >>> getfixture('restore_config_afterwards')
-
 The various settings are listed here with their defaults.
-
     >>> import pyphi
     >>> defaults = pyphi.config.defaults()
-
 Print the ``config`` object to see the current settings:
-
     >>> print(pyphi.config)  # doctest: +SKIP
     { 'ASSUME_CUTS_CANNOT_CREATE_NEW_CONCEPTS': False,
       'CACHE_POTENTIAL_PURVIEWS': True,
       ...
-
 Setting can be changed on the fly by assigning them a new value:
-
     >>> pyphi.config.PROGRESS_BARS = False
-
 It is also possible to manually load a configuration file:
-
     >>> pyphi.config.load_file('pyphi_config.yml')
-
 Or load a dictionary of configuration values:
-
     >>> pyphi.config.load_dict({'PRECISION': 1})
-
-
 The ``config`` API
 ~~~~~~~~~~~~~~~~~~
 """
@@ -99,10 +82,8 @@ def deprecated(option):
 
 class Option:
     """A descriptor implementing PyPhi configuration options.
-
     Args:
         default: The default value of this ``Option``.
-
     Keyword Args:
         values (list): Allowed values for this option. A ``ValueError`` will
             be raised if ``values`` is not ``None`` and the option is set to
@@ -158,28 +139,12 @@ class Option:
 
     def _validate(self, value):
         """Validate the new value."""
-        if self.type is not None:
-            if not isinstance(value, self.type):
-                raise ConfigurationError(
-                    "{} must be of type {} for {}; got {}".format(
-                        value, self.type, self.name, type(value)
-                    )
+        if self.type is not None and not isinstance(value, self.type):
+            raise ConfigurationError(
+                "{} must be of type {} for {}; got {}".format(
+                    value, self.type, self.name, type(value)
                 )
-            elif self.type is Mapping:
-                # Collect all missing key-value pairs from configuration.
-                # If any, throw error indicating all missing pairs.
-                missing = [
-                    (k, type(v)) for k, v in self.default.items()
-                    if k not in value or not isinstance(value[k], type(v))
-                ]
-                if missing:
-                    raise ConfigurationError(
-                        "{} option must contain {{{}}}; only got {}".format(
-                            self.name,
-                            ", ".join(["'{}': {}".format(k, v) for k, v in missing]),
-                            value
-                        )
-                    )
+            )
         if self.values and value not in self.values:
             raise ConfigurationError(
                 "{} ({}) is not a valid value for {}; must be one of:\n    {}".format(
@@ -198,7 +163,6 @@ class Option:
 
 class Config:
     """Base configuration object.
-
     See ``PyphiConfig`` for usage.
     """
 
@@ -295,12 +259,10 @@ class Config:
 
     def override(self, **new_values):
         """Decorator and context manager to override configuration values.
-
         The initial configuration values are reset after the decorated function
         returns or the context manager completes it block, even if the function
         or block raises an exception. This is intended to be used by tests
         which require specific configuration values.
-
         Example:
             >>> from pyphi import config
             >>> @config.override(PRECISION=20000)
@@ -316,7 +278,6 @@ class Config:
 
     def diff(self, other):
         """Return differences between this configuration and another.
-
         Returns:
             tuple[dict]: A tuple of two dictionaries. The first contains the
             differing values of this configuration; the second contains those of
@@ -388,7 +349,6 @@ def on_change_distinction_phi_normalization(obj):
     IMPORTANT: Changes to `DISTINCTION_PHI_NORMALIZATION` will not be reflected in
     new MICE computations for existing Subsystem objects if the MICE have been
     previously computed, since they are cached.
-
     Make sure to call `subsystem.clear_caches()` before re-computing MICE with
     the new setting.
             """,
@@ -423,19 +383,14 @@ class PyphiConfig(Config):
     concepts. A full list of currently installed measures is available by
     calling ``print(pyphi.distance.measures.all())``. Note that some measures
     cannot be used for calculating |big_phi| because they are asymmetric.
-
     Custom measures can be added using the ``pyphi.distance.measures.register``
     decorator. For example::
-
         from pyphi.metrics.distribution import measures
-
         @measures.register('ALWAYS_ZERO')
         def always_zero(a, b):
             return 0
-
     This measure can then be used by setting
     ``config.REPERTOIRE_DISTANCE = 'ALWAYS_ZERO'``.
-
     If the measure is asymmetric you should register it using the
     ``asymmetric`` keyword argument. See :mod:`~pyphi.distance` for examples.
     """,
@@ -453,7 +408,6 @@ class PyphiConfig(Config):
         "SUM_SMALL_PHI",
         doc="""
     The measure to use when computing distances between cause-effect structures.
-
     See documentation for ``config.REPERTOIRE_DISTANCE`` for more information on
     configuring measures.
     """,
@@ -464,7 +418,6 @@ class PyphiConfig(Config):
         doc="""
     The measure to use when computing the pointwise information between state
     probabilities in the actual causation module.
-
     See documentation for ``config.REPERTOIRE_DISTANCE`` for more information on
     configuring measures.
     """,
@@ -549,7 +502,6 @@ class PyphiConfig(Config):
         type=Mapping,
         doc="""
     Controls parallel evaluation of relations.
-
     Only applies if RELATION_COMPUTATION = 'CONCRETE'.
     """,
     )
@@ -635,14 +587,10 @@ class PyphiConfig(Config):
         type=bool,
         doc="""
     Specifies whether to suppress the welcome message when PyPhi is imported.
-
     Alternatively, you may suppress the message by setting the environment
     variable ``PYPHI_WELCOME_OFF`` to any value in your shell:
-
     .. code-block:: bash
-
         export PYPHI_WELCOME_OFF='yes'
-
     The message will not print if either this option is ``True`` or the
     environment variable is set.""",
     )
@@ -683,7 +631,6 @@ class PyphiConfig(Config):
         type=bool,
         doc="""
     Controls whether to show progress bars on the console.
-
       .. tip::
         If you are iterating over many systems rather than doing one
         long-running calculation, consider disabling this for speed.""",
@@ -744,7 +691,6 @@ class PyphiConfig(Config):
     to ``0``, ``1``, or ``2``. If set to ``1``, calling ``repr`` on PyPhi
     objects will return pretty-formatted and legible strings, excluding
     repertoires. If set to ``2``, ``repr`` calls also include repertoires.
-
     Although this breaks the convention that ``__repr__`` methods should return
     a representation which can reconstruct the object, readable representations
     are convenient since the Python REPL calls ``repr`` to represent all
@@ -766,64 +712,45 @@ class PyphiConfig(Config):
         "ALL",
         doc="""
     Controls the type of partition used for |small_phi| computations.
-
     If set to ``'BI'``, partitions will have two parts.
-
     If set to ``'TRI'``, partitions will have three parts. In addition,
     computations will only consider partitions that strictly partition the
     mechanism. That is, for the mechanism ``(A, B)`` and purview ``(B, C, D)``
     the partition::
-
       A,B    ∅
       ─── ✕ ───
        B    C,D
-
     is not considered, but::
-
        A     B
       ─── ✕ ───
        B    C,D
-
     is. The following is also valid::
-
       A,B     ∅
       ─── ✕ ─────
        ∅    B,C,D
-
     In addition, this setting introduces "wedge" tripartitions of the form::
-
        A     B     ∅
       ─── ✕ ─── ✕ ───
        B     C     D
-
     where the mechanism in the third part is always empty.
-
     Finally, if set to ``'ALL'``, all possible partitions will be tested.
-
     You can experiment with custom partitioning strategies using the
     ``pyphi.partition.partition_types.register`` decorator. For example::
-
         from pyphi.models import KPartition, Part
         from pyphi.partition import partition_types
-
         @partition_types.register('SINGLE_NODE')
         def single_node_partitions(mechanism, purview, node_labels=None):
            for element in mechanism:
                element = tuple([element])
                others = tuple(sorted(set(mechanism) - set(element)))
-
                part1 = Part(mechanism=element, purview=())
                part2 = Part(mechanism=others, purview=purview)
-
                yield KPartition(part1, part2, node_labels=node_labels)
-
     This generates the set of partitions that cut connections between a single
     mechanism element and the entire purview. The mechanism and purview of each
     |Part| remain undivided - only connections *between* parts are severed.
-
     You can use this new partititioning scheme by setting
     ``config.PARTITION_TYPE = 'SINGLE_NODE'``.
-
     See :mod:`~pyphi.partition` for more examples.""",
     )
 
@@ -832,7 +759,6 @@ class PyphiConfig(Config):
         type=bool,
         doc="""
     Whether to include the complete partition in partition set.
-
     Currently only applies to "SET_UNI/BI".
     """,
     )
@@ -866,7 +792,6 @@ class PyphiConfig(Config):
         "PHI",
         doc="""
     Controls how ties among states are resolved.
-
     NOTE: Operation is `max`.
     """,
     )
@@ -875,7 +800,6 @@ class PyphiConfig(Config):
         ["NORMALIZED_PHI", "NEGATIVE_PHI"],
         doc="""
     Controls how ties among mechanism partitions are resolved.
-
     NOTE: Operation is `min`; with the default values, the minimum normalized
     phi is taken, then in case of ties, the maximal un-normalized phi is taken.
     """,
@@ -885,7 +809,6 @@ class PyphiConfig(Config):
         "PHI",
         doc="""
     Controls how ties among purviews are resolved.
-
     NOTE: Operation is `max`.
     """,
     )
@@ -1047,7 +970,6 @@ PARALLEL_KWARGS = [
 
 def parallel_kwargs(option_kwargs, **user_kwargs):
     """Return the kwargs for a parallel function call.
-
     Applies user overrides to the global configuration.
     """
     kwargs = copy(option_kwargs)

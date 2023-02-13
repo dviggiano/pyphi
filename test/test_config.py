@@ -175,14 +175,6 @@ def test_reconfigure_logging_on_change(capsys):
             ],
             [
                 dict(
-                    parallel=True,
-                ),
-                dict(
-                    parallel=False,
-                    sequential_threshold=2**9,
-                    progress=False,
-                ),
-                dict(
                     val=False,
                 ),
                 True,
