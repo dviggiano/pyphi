@@ -38,7 +38,14 @@ def test_all_complexes_parallelization(use_iit_3_config, s):
     with config.override(PARALLEL_COMPLEX_EVALUATION={"parallel": False}):
         serial = compute.network.all_complexes(s.network, s.state)
 
-    with config.override(PARALLEL_COMPLEX_EVALUATION={"parallel": True}):
+    with config.override(
+        PARALLEL_CUT_EVALUATION=dict(
+            chunksize=4096,
+            parallel=True,
+            sequential_threshold=1024,
+            progress=True,
+        )
+    ):
         parallel = compute.network.all_complexes(s.network, s.state)
 
     assert sorted(serial) == sorted(parallel)
