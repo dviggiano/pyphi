@@ -24,10 +24,22 @@ def test_uniform_distribution():
 
 
 def test_purview_max_entropy_distribution():
-    max_ent = distribution.max_entropy_distribution((0, 1), 3)
-    assert max_ent.shape == (2, 2, 1)
-    assert np.array_equal(max_ent, (np.ones(4) / 4).reshape((2, 2, 1)))
-    assert max_ent[0][1][0] == 0.25
+    node_indices = (0, 1)    
+    
+    max_ent = distribution.max_entropy_distribution(node_indices, (0,))
+    assert max_ent.shape == (2, 1)
+    assert np.array_equal(max_ent, np.ones((2, 1)) / 2)
+    assert max_ent[0][0] == 0.5
+    
+    max_ent = distribution.max_entropy_distribution(node_indices, (0, 1))
+    assert max_ent.shape == (2, 2)
+    assert np.array_equal(max_ent, np.ones((2, 2)) / 4)
+    assert max_ent[0][0] == 0.25
+    
+    max_ent = distribution.max_entropy_distribution(node_indices, (0, 1, 3))
+    assert max_ent.shape == (2, 2)
+    assert np.array_equal(max_ent, np.ones((2, 2)) / 4)
+    assert max_ent[0][0] == 0.25
 
 
 def test_marginal_zero():
