@@ -21,7 +21,7 @@ def test_possible_complexes(s):
     ]
 
 
-def test_complexes_standard(s):
+def test_complexes_standard(use_iit_3_config, s):
     complexes = list(compute.network.complexes(s.network, s.state), parallel=False)
     check_sia(complexes[0], standard_answer)
 
@@ -33,12 +33,12 @@ def test_all_complexes_standard(s):
     check_sia(complexes[0], standard_answer)
 
 
-@config.override(PARALLEL_CUT_EVALUATION=False)
+@config.override(PARALLEL_CUT_EVALUATION={"parallel": False})
 def test_all_complexes_parallelization(use_iit_3_config, s):
-    with config.override(PARALLEL_COMPLEX_EVALUATION=False):
+    with config.override(PARALLEL_COMPLEX_EVALUATION={"parallel": False}):
         serial = compute.network.all_complexes(s.network, s.state)
 
-    with config.override(PARALLEL_COMPLEX_EVALUATION=True):
+    with config.override(PARALLEL_COMPLEX_EVALUATION={"parallel": True}):
         parallel = compute.network.all_complexes(s.network, s.state)
 
     assert sorted(serial) == sorted(parallel)
