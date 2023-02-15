@@ -191,12 +191,16 @@ def _ces(subsystem, **kwargs):
     cuts, since we have free processors because we're not computing any cuts
     yet.
     """
-    kwargs = {"parallel": config.PARALLEL_CUT_EVALUATION, **kwargs}
-    return ces(subsystem, **kwargs)
+    parallel_kwargs = conf.parallel_kwargs(
+        config.PARALLEL_RELATION_EVALUATION, **kwargs
+    )
+    return ces(subsystem, **parallel_kwargs)
 
 
 def _sia_map_reduce(cuts, subsystem, unpartitioned_ces, **kwargs):
-    kwargs = {"parallel": config.PARALLEL_CUT_EVALUATION, **kwargs}
+    parallel_kwargs = conf.parallel_kwargs(
+        config.PARALLEL_RELATION_EVALUATION, **kwargs
+    )
     return MapReduce(
         evaluate_cut,
         cuts,
@@ -208,7 +212,7 @@ def _sia_map_reduce(cuts, subsystem, unpartitioned_ces, **kwargs):
         reduce_kwargs=dict(default=_null_sia(subsystem)),
         shortcircuit_func=utils.is_falsy,
         desc="Evaluating cuts",
-        **kwargs,
+        **parallel_kwargs,
     ).run()
 
 
