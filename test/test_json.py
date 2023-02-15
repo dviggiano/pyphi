@@ -91,7 +91,7 @@ def test_json_deserialization_non_pyphi_clasess():
 
 
 def test_deserialization_memoizes_duplicate_objects(use_iit_3_config, s):
-    with config.override(PARALLEL_CUT_EVALUATION=True):
+    with config.override(PARALLEL_CUT_EVALUATION={"parallel": True}):
         sia = compute.subsystem.sia(s)
 
     loaded = jsonify.loads(jsonify.dumps(sia))
