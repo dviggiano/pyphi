@@ -192,14 +192,14 @@ def _ces(subsystem, **kwargs):
     yet.
     """
     parallel_kwargs = conf.parallel_kwargs(
-        config.PARALLEL_RELATION_EVALUATION, **kwargs
+        config.PARALLEL_CUT_EVALUATION, **kwargs
     )
     return ces(subsystem, **parallel_kwargs)
 
 
 def _sia_map_reduce(cuts, subsystem, unpartitioned_ces, **kwargs):
     parallel_kwargs = conf.parallel_kwargs(
-        config.PARALLEL_RELATION_EVALUATION, **kwargs
+        config.PARALLEL_CUT_EVALUATION, **kwargs
     )
     return MapReduce(
         evaluate_cut,
