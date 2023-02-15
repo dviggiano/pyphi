@@ -103,10 +103,11 @@ def test_purview(s):
 
 
 def test_repertoire_shape():
-    N = 3
-    assert distribution.repertoire_shape((), N) == [1, 1, 1]
-    assert distribution.repertoire_shape((1, 2), N) == [1, 2, 2]
-    assert distribution.repertoire_shape((0, 2), N) == [2, 1, 2]
+    purview = (0, 2)
+    assert distribution.repertoire_shape(range(3), purview) == [2, 1, 2]
+    assert distribution.repertoire_shape(range(4), purview) == [2, 1, 2, 1]
+    assert distribution.repertoire_shape((0, 2), purview) == [2, 2]
+    assert distribution.repertoire_shape((4,), purview) == [1]
 
 
 def test_flatten():
