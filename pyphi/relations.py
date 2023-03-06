@@ -44,12 +44,23 @@ class RelationFace(frozenset):
 
     @property
     def relata_units(self):
-        """The cause/effect purview of each cause/effect in this face."""
+        """The Units in the purview of each cause/effect in this face."""
         return (set(relatum.purview_units) for relatum in self)
 
     @property
     def relata_purviews(self):
+        """The purview of each cause/effect in this face."""
         return (relatum.purview for relatum in self)
+
+    @property
+    def distinctions(self):
+        """The distinctions whose causes/effects are in this face."""
+        return (relatum.parent for relatum in self)
+
+    @property
+    def num_distinctions(self):
+        """The number of distinctions whose causes/effects are in this face."""
+        return len(set(self.distinctions))
 
     def __bool__(self):
         return bool(self.congruent_overlap)
@@ -226,7 +237,9 @@ class ConcreteRelations(frozenset, Relations):
         body = "\n".join(
             fmt.align_columns(self._repr_columns()) + [fmt.margin(r) for r in self]
         )
-        return fmt.header("ConcreteRelations", body, fmt.HEADER_BAR_1, fmt.HEADER_BAR_1)
+        return fmt.header(
+            self.__class__.__name__, body, fmt.HEADER_BAR_1, fmt.HEADER_BAR_1
+        )
 
 
 class AnalyticalRelations(Relations):

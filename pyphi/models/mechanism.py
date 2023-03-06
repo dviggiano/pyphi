@@ -5,6 +5,7 @@
 """Mechanism-level objects."""
 
 from dataclasses import dataclass
+from enum import Enum, auto, unique as unique_enum
 from functools import total_ordering
 from typing import Iterable, Tuple
 
@@ -149,6 +150,16 @@ def normalization_factor(partition):
     )
 
 
+@unique_enum
+class ShortCircuitConditions(Enum):
+    # MICE level reasons
+    NO_PURVIEWS = auto()
+    NO_PARTITIONS = auto()
+    # MIP level reasons
+    EMPTY_PURVIEW = auto()
+    UNREACHABLE_STATE = auto()
+
+
 _ria_attributes = [
     "phi",
     "direction",
@@ -185,6 +196,8 @@ class RepertoireIrreducibilityAnalysis(cmp.OrderableByPhi):
         mechanism_state=None,
         purview_state=None,
         node_labels=None,
+        selectivity=None,
+        reasons=None,
     ):
         self._phi = PyPhiFloat(phi)
         self._direction = direction
@@ -204,6 +217,8 @@ class RepertoireIrreducibilityAnalysis(cmp.OrderableByPhi):
         self._specified_state = specified_state
         self._partition_ties = (self,)
         self._state_ties = (self,)
+        self._selectivity = selectivity
+        self._reasons = reasons
 
         norm = normalization_factor(self._partition)
 
@@ -273,6 +288,16 @@ class RepertoireIrreducibilityAnalysis(cmp.OrderableByPhi):
         partition.
         """
         return self._partitioned_repertoire
+
+    @property
+    def selectivity(self):
+        """float: The selectivity factor."""
+        return self._selectivity
+
+    @property
+    def reasons(self):
+        """Reasons why the computation short-circuited."""
+        return self._reasons
 
     @property
     def specified_state(self):
@@ -363,11 +388,81 @@ class RepertoireIrreducibilityAnalysis(cmp.OrderableByPhi):
             )
         )
 
+    def _repr_columns(self):
+        cols = [
+            (fmt.SMALL_PHI, self.phi),
+            (f"Normalized {fmt.SMALL_PHI}", self.normalized_phi),
+            ("Mechanism", fmt.fmt_mechanism(self.mechanism, self.node_labels)),
+            ("Purview", fmt.fmt_mechanism(self.purview, self.node_labels)),
+        ]
+
+        if self.specified_state is not None:
+            cols.append(("Specified state", str(self.specified_state)))
+
+        if self.selectivity is not None:
+            cols.append(("Selectivity", self.selectivity))
+
+        if self.repertoire is not None:
+            if self.specified_state is not None:
+                mark_states = [
+                    specified.state for specified in self.specified_state.ties
+                ]
+            else:
+                mark_states = []
+            if self.repertoire.size == 1:
+                repertoire_str = self.repertoire
+                repertoire = ("Forward Pr", repertoire_str)
+                partitioned_repertoire_str = self.partitioned_repertoire
+                partitioned_repertoire = (
+                    "Partitioned forward Pr",
+                    partitioned_repertoire_str,
+                )
+            else:
+                repertoire_str = fmt.fmt_repertoire(
+                    self.repertoire, mark_states=mark_states
+                )
+                repertoire = ("Repertoire", repertoire_str)
+                partitioned_repertoire_str = fmt.fmt_repertoire(
+                    self.partitioned_repertoire, mark_states=mark_states
+                )
+                partitioned_repertoire = (
+                    "Partitioned repertoire",
+                    partitioned_repertoire_str,
+                )
+            cols.append(repertoire)
+            cols.append(partitioned_repertoire)
+
+        if self.partition:
+            partition_str = fmt.fmt_partition(self.partition)
+        else:
+            partition_str = "empty"
+        cols.append(("Partition", partition_str))
+
+        if self.reasons is not None:
+            cols.append(("Reasons", ", ".join(map(str, self.reasons))))
+
+        cols += [
+            ("State ties", self.num_state_ties),
+            ("Partition ties", self.num_partition_ties),
+        ]
+
+        return cols
+
+    def make_repr(self, title=None, columns=None):
+        if title is None:
+            title = self.__class__.__name__
+        if columns is None:
+            columns = self._repr_columns()
+        lines = fmt.align_columns(columns)
+        body = "\n".join(lines)
+        body = fmt.header(title, body, under_char=fmt.HEADER_BAR_2, center=True)
+        return fmt.box(body)
+
     def __repr__(self):
-        return fmt.make_repr(self, _ria_attributes)
+        return self.make_repr()
 
     def __str__(self):
-        return "Repertoire irreducibility analysis\n" + fmt.indent(fmt.fmt_ria(self))
+        return repr(self)
 
     def to_json(self):
         # TODO(ties) implement serialization of ties
@@ -483,6 +578,11 @@ class MaximallyIrreducibleCauseOrEffect(cmp.Orderable):
         return self._ria.partitioned_repertoire
 
     @property
+    def selectivity(self):
+        """float: The selectivity factor."""
+        return self._ria.selectivity
+
+    @property
     def specified_state(self):
         """The state(s) with the maximal absolute intrinsic difference
         between the unpartitioned and partitioned repertoires."""
@@ -494,6 +594,18 @@ class MaximallyIrreducibleCauseOrEffect(cmp.Orderable):
         this mechanism.
         """
         return self._ria
+
+    @property
+    def node_labels(self):
+        return self.ria.node_labels
+
+    @property
+    def partition(self):
+        return self.ria.partition
+
+    @property
+    def reasons(self):
+        return self.ria.reasons
 
     @property
     def state_ties(self):
@@ -512,6 +624,10 @@ class MaximallyIrreducibleCauseOrEffect(cmp.Orderable):
             tie._state_ties = ties
 
     @property
+    def num_state_ties(self):
+        return self.ria.num_state_ties
+
+    @property
     def partition_ties(self):
         if self._partition_ties is None:
             self._partition_ties = (self,) + tuple(
@@ -527,6 +643,10 @@ class MaximallyIrreducibleCauseOrEffect(cmp.Orderable):
         # Update partition ties on other tied objects
         for tie in flatten([self.state_ties, self.purview_ties]):
             tie._partition_ties = ties
+
+    @property
+    def num_partition_ties(self):
+        return self.ria.num_partition_ties
 
     @property
     def purview_ties(self):
@@ -556,17 +676,19 @@ class MaximallyIrreducibleCauseOrEffect(cmp.Orderable):
         """Return whether the state specified by this MICE is congruent."""
         return self.ria.is_congruent(specified_state)
 
+    def _repr_columns(self):
+        return self.ria._repr_columns() + [
+            ("#(partition ties)", self.num_partition_ties),
+        ]
+
     def __repr__(self):
-        return fmt.make_repr(self, ["ria"])
+        # TODO just use normal repr when subclass of RIA
+        title = f"Maximally-irreducible {str(self.direction).lower()}"
+        columns = self.ria._repr_columns() + [("Purview ties", self.num_partition_ties)]
+        return self.ria.make_repr(title=title, columns=columns)
 
     def __str__(self):
-        return "\n".join(
-            [
-                "Maximally-irreducible {}".format(str(self.direction).lower()),
-                fmt.indent(fmt.fmt_ria(self.ria, mip=True)),
-                fmt.indent(f"#(purview ties): {self.num_purview_ties}"),
-            ]
-        )
+        return self.__repr__()
 
     unorderable_unless_eq = RepertoireIrreducibilityAnalysis.unorderable_unless_eq
 

@@ -28,7 +28,7 @@ from .models import (
     RepertoireIrreducibilityAnalysis,
     _null_ria,
 )
-from .models.mechanism import StateSpecification
+from .models.mechanism import StateSpecification, ShortCircuitConditions
 from .network import irreducible_purviews
 from .node import generate_nodes
 from .partition import mip_partitions
@@ -740,6 +740,7 @@ class Subsystem:
                 repertoire_distance=repertoire_distance,
                 **kwargs,
             )
+            selectivity = None
         return RepertoireIrreducibilityAnalysis(
             phi=phi,
             direction=direction,
@@ -753,6 +754,7 @@ class Subsystem:
             # TODO(4.0) refactor
             specified_state=kwargs.get("state"),
             node_labels=self.node_labels,
+            selectivity=selectivity,
         )
 
     def _find_mip_single_state(
@@ -829,9 +831,12 @@ class Subsystem:
             the mininum-information partition in one temporal direction.
 
         """
-        null_mip = _null_ria(direction, mechanism, purview, specified_state=state)
+
+        def null_mip(**kwargs):
+            return _null_ria(direction, mechanism, purview, specified_state=state)
+
         if not purview:
-            return null_mip
+            return null_mip(reasons=(ShortCircuitConditions.EMPTY_PURVIEW,))
 
         # Calculate the unpartitioned repertoire to compare against the
         # partitioned ones.
@@ -839,13 +844,12 @@ class Subsystem:
 
         # State is unreachable - return 0 instead of giving nonsense results
         # TODO(4.0) re-evaluate this with the GID
-        # TODO(4.0) record shortcircuit reasons
         if direction == Direction.CAUSE and np.all(repertoire == 0):
-            return null_mip
+            return null_mip(reasons=(ShortCircuitConditions.UNREACHABLE_STATE,))
 
         if partitions is not None:
-            # Must convert to list to allow for multiple iterations in case of
-            # tied states
+            # NOTE: Must convert to list to allow for multiple iterations in
+            # case of tied states
             partitions = list(partitions)
 
         parallel_kwargs = conf.parallel_kwargs(
@@ -1074,12 +1078,19 @@ class Subsystem:
         else:
             validate.direction(direction)
 
-        # TODO(ties) put specified state in here
-        null_mice = mice_class(_null_ria(direction, mechanism, ()))
+        no_purviews = mice_class(
+            _null_ria(
+                direction,
+                mechanism,
+                (),
+                reasons=(ShortCircuitConditions.NO_PURVIEWS,),
+            )
+        )
 
         if not purviews:
-            return null_mice
+            return no_purviews
 
+        # TODO put purview first in signature to avoid
         def _find_mip(purview):
             return self.find_mip(direction, mechanism, purview)
 
@@ -1096,7 +1107,7 @@ class Subsystem:
 
         all_mice = map(mice_class, map_reduce.run())
         # Record purview ties
-        ties = tuple(resolve_ties.purviews(all_mice, default=null_mice))
+        ties = tuple(resolve_ties.purviews(all_mice, default=no_purviews))
         # TODO(ties) refactor this into `resolve_ties.purviews`?
         for tie in ties:
             tie.set_purview_ties(ties)
@@ -1114,7 +1125,7 @@ class Subsystem:
 
         Alias for |find_mice()| with ``direction`` set to |EFFECT|.
         """
-        return self.find_mice(Direction.EFFECT, mechanism, purviews=purviews)
+        return self.find_mice(Direction.EFFECT, mechanism, purviews=purviews, **kwargs)
 
     def phi_max(self, mechanism):
         """Return the |small_phi_max| of a mechanism.

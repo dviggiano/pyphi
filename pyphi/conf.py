@@ -973,7 +973,11 @@ config = PyphiConfig(on_change=on_change_global)
 def on_driver():
     if ray.is_initialized():
         try:
-            ray.get_runtime_context().task_id
+            # Ignore warning log
+            current_level = ray.runtime_context.logger.level
+            ray.runtime_context.logger.setLevel("ERROR")
+            ray.get_runtime_context().get_task_id()
+            ray.runtime_context.logger.setLevel(current_level)
             return False
         except AssertionError:
             pass
@@ -1010,24 +1014,26 @@ def fallback(*args):
 
 
 PARALLEL_KWARGS = [
-    'reduce_func',
-    'reduce_kwargs',
-    'parallel',
-    'total',
-    'chunksize',
-    'sequential_threshold',
-    'max_depth',
-    'max_size',
-    'max_leaves',
-    'branch_factor',
-    'shortcircuit_func',
-    'shortcircuit_callback',
-    'shortcircuit_callback_args',
-    'inflight_limit',
-    'progress',
-    'desc',
-    'map_kwargs',
+    "reduce_func",
+    "reduce_kwargs",
+    "parallel",
+    "ordered",
+    "total",
+    "chunksize",
+    "sequential_threshold",
+    "max_depth",
+    "max_size",
+    "max_leaves",
+    "branch_factor",
+    "shortcircuit_func",
+    "shortcircuit_callback",
+    "shortcircuit_callback_args",
+    "inflight_limit",
+    "progress",
+    "desc",
+    "map_kwargs",
 ]
+
 
 def parallel_kwargs(option_kwargs, **user_kwargs):
     """Return the kwargs for a parallel function call.

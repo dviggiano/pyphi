@@ -269,10 +269,11 @@ def sia_minimization_key(sia):
 
 def sia(
     subsystem: Subsystem,
-    repertoire_distance: str = None,
+    repertoire_distance: Optional[str] = None,
     directions: Optional[Iterable[Direction]] = None,
-    partition_scheme: str = None,
+    partition_scheme: Optional[str] = None,
     partitions: Optional[Iterable] = None,
+    system_state: Optional[SystemStateSpecification] = None,
     **kwargs,
 ) -> SystemIrreducibilityAnalysis:
     """Find the minimum information partition of a system."""
@@ -280,28 +281,27 @@ def sia(
 
     # TODO(4.0): trivial reducibility
 
-    filter_func = None
-    if partitions == "GENERAL":
+    if partitions is None:
+        filter_func = None
+        if partitions == "GENERAL":
 
-        def is_disconnecting_partition(partition):
-            # Special case for length 1 subsystems so complete partition is included
-            return (
-                not connectivity.is_strong(subsystem.apply_cut(partition).proper_cm)
-            ) or len(subsystem) == 1
+            def is_disconnecting_partition(partition):
+                # Special case for length 1 subsystems so complete partition is included
+                return (
+                    not connectivity.is_strong(subsystem.apply_cut(partition).proper_cm)
+                ) or len(subsystem) == 1
 
-        filter_func = is_disconnecting_partition
+            filter_func = is_disconnecting_partition
 
-    partitions = fallback(
-        partitions,
-        system_partitions(
+        partitions = system_partitions(
             subsystem.node_indices,
             node_labels=subsystem.node_labels,
             partition_scheme=partition_scheme,
             filter_func=filter_func,
-        ),
-    )
+        )
 
-    system_state = system_intrinsic_information(subsystem)
+    if system_state is None:
+        system_state = system_intrinsic_information(subsystem)
 
     def _null_sia(**kwargs):
         return NullSystemIrreducibilityAnalysis(
@@ -434,7 +434,7 @@ class PhiStructure(cmp.Orderable):
             return self._sum_phi_distinctions
         except AttributeError:
             # TODO delegate sum to distinctions
-            self._sum_phi_distinctions = sum(self.distinctions.phis)
+            self._sum_phi_distinctions = self.distinctions.sum_phi()
             return self._sum_phi_distinctions
 
     @property
@@ -463,7 +463,6 @@ class NullPhiStructure(PhiStructure):
 
 def phi_structure(
     subsystem: Subsystem,
-    parallel: bool = True,
     sia: SystemIrreducibilityAnalysis = None,
     distinctions: CauseEffectStructure = None,
     relations: Relations = None,
@@ -472,10 +471,9 @@ def phi_structure(
     relations_kwargs: dict = None,
 ) -> PhiStructure:
     """Analyze the irreducible cause-effect structure of a system."""
-    defaults = dict(parallel=parallel)
-    sia_kwargs = {**defaults, **(sia_kwargs or {})}
-    ces_kwargs = {**defaults, **(ces_kwargs or {})}
-    relations_kwargs = {**defaults, **(relations_kwargs or {})}
+    sia_kwargs = sia_kwargs or dict()
+    ces_kwargs = ces_kwargs or dict()
+    relations_kwargs = relations_kwargs or dict()
 
     # Analyze irreducibility if not provided
     if sia is None:
