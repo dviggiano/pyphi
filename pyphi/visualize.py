@@ -33,7 +33,7 @@ from .utils import state_of
 def two_relation_face_type(relation_face):
     if len(relation_face) != 2:
         raise ValueError(f"must be a 2-relation; got a {len(relation_face)}-relation")
-    purview = list(map(set, relation_face.relata.purviews))
+    purview = list(map(set, relation_face.relata_purviews))
     # Isotext (mutual full-overlap)
     if purview[0] == purview[1] == relation_face.purview:
         return "isotext"
@@ -106,8 +106,8 @@ GREYS = PhiPlotTheme(
 _TYPE_COLORS = {"isotext": "magenta", "inclusion": "indigo", "paratext": "cyan"}
 
 
-def type_color(relation):
-    return _TYPE_COLORS[two_relation_face_type(relation)]
+def type_color(face):
+    return _TYPE_COLORS[two_relation_face_type(face)]
 
 
 TWO_RELATION_COLORSCHEMES = {"type": type_color}
@@ -301,7 +301,7 @@ class Labeler:
                     "<br>".join(
                         [
                             f"M: {self.nodes(mice.mechanism)}",
-                            f"P: {self.nodes(mice.purview, state=mice.specified_state[0])}",
+                            f"P: {self.nodes(mice.purview, state=mice.specified_state)}",
                             f"φ: {round(mice.phi, config.PRECISION)}",
                             f"S: {','.join(map(str, mice.specified_state))}",
                         ]
@@ -317,7 +317,7 @@ class Labeler:
         return f"{len(relation)}-relation<br>" + indent(
             "<br>".join(
                 [
-                    f"P: {self.nodes(relation.purview)}",
+                    # f"P: {self.nodes(relation.purview)}", TODO fix this
                     f"φ: {round(relation.phi, config.PRECISION)}",
                     "Relata:",
                     indent(self.relata(relation.relata)),
@@ -477,9 +477,9 @@ def _plot_mechanism_purview_links(
         showlegend = False
 
 
-def _plot_two_relations(fig, relation_to_coords, relations, label, theme):
+def _plot_two_relations(fig, relation_to_coords, faces, phis, label, theme):
     name = "2-relations" + theme.legendgroup_postfix
-    phis = np.array(list(relations.phis))
+    phis = np.array(phis)
     widths = rescale(phis, theme.line_width_range)
 
     if isinstance(theme.two_relation_colorscale, Mapping):
@@ -487,7 +487,7 @@ def _plot_two_relations(fig, relation_to_coords, relations, label, theme):
         line_colors = list(
             map(
                 theme.two_relation_colorscale.get,
-                map(two_relation_face_type, relations),
+                map(two_relation_face_type, faces),
             )
         )
     elif (
@@ -502,19 +502,19 @@ def _plot_two_relations(fig, relation_to_coords, relations, label, theme):
     elif theme.two_relation_colorscale in TWO_RELATION_COLORSCHEMES:
         # Library function
         line_colors = list(
-            map(TWO_RELATION_COLORSCHEMES[theme.two_relation_colorscale], relations)
+            map(TWO_RELATION_COLORSCHEMES[theme.two_relation_colorscale], faces)
         )
     else:
         # Callable
-        line_colors = list(map(theme.two_relation_colorscale, relations))
+        line_colors = list(map(theme.two_relation_colorscale, faces))
 
     showlegend = True
-    for relation, width, line_color in zip(
-        relations,
+    for face, width, line_color in zip(
+        faces,
         widths,
         line_colors,
     ):
-        x, y, z = relation_to_coords(relation).transpose()
+        x, y, z = relation_to_coords(face).transpose()
         fig.add_trace(
             go.Scatter3d(
                 x=x,
@@ -528,27 +528,27 @@ def _plot_two_relations(fig, relation_to_coords, relations, label, theme):
                 opacity=theme.two_relation_opacity,
                 line_width=width,
                 hoverinfo="text",
-                hovertext=label.relation(relation),
-                hoverlabel_font_color=theme.two_relations_hoverlabel_font_color,
+                # hovertext=label.relation(face),
+                # hoverlabel_font_color=theme.two_relations_hoverlabel_font_color,
             )
         )
         # Only show the first trace in the legend
         showlegend = False
 
 
-def _plot_three_relations(fig, relation_to_coords, relations, label, theme):
+def _plot_three_relations(fig, relation_to_coords, faces, phis, label, theme):
     name = "3-relations" + theme.legendgroup_postfix
     # Build vertices:
     # Stack the [relation, relata] axes together and tranpose to put the 3D axis
     # first to get lists of x, y, z coordinates
-    x, y, z = np.vstack(list(map(relation_to_coords, relations))).transpose()
+    x, y, z = np.vstack(list(map(relation_to_coords, faces))).transpose()
     # Build triangles:
     # The vertices are stacked triples, so we want each (i, j, k) = [0, 1, 2], [3, 4, 5], ...
-    relata_indices = np.arange(len(relations) * 3, step=3)
+    relata_indices = np.arange(len(faces) * 3, step=3)
     i, j, k = np.tile(relata_indices, (3, 1)) + np.arange(3).reshape(3, 1)
-    phis = np.array(list(relations.phis))
+    phis = np.array(phis)
     intensities = rescale(phis, theme.three_relation_intensity_range)
-    hovertext = list(map(label.relation, relations))
+    # hovertext = list(map(label.relation, faces))
     fig.add_trace(
         go.Mesh3d(
             x=x,
@@ -572,23 +572,23 @@ def _plot_three_relations(fig, relation_to_coords, relations, label, theme):
             opacity=theme.three_relation_opacity,
             lighting=theme.lighting,
             hoverinfo="text",
-            hovertext=hovertext,
+            # hovertext=hovertext,
         )
     )
 
 
 def _plot_three_relations_with_opacity(
-    fig, relation_to_coords, relations, label, theme
+    fig, relation_to_coords, faces, phis, label, theme
 ):
     name = "3-relations" + theme.legendgroup_postfix
     # Build vertices:
     # Stack the [relation, relata] axes together and tranpose to put the 3D axis
     # first to get lists of x, y, z coordinates
-    x, y, z = np.vstack(list(map(relation_to_coords, relations))).transpose()
-    phis = np.array(list(relations.phis))
+    x, y, z = np.vstack(list(map(relation_to_coords, faces))).transpose()
+    phis = np.array(phis)
     intensities = rescale(phis, theme.three_relation_intensity_range)
     opacities = rescale(phis, theme.three_relation_opacity_range)
-    hovertexts = list(map(label.relation, relations))
+    # hovertexts = list(map(label.relation, faces))
     showlegend = theme.three_relation_showlegend
     showscale = theme.three_relation_showscale
     for _x, _y, _z, intensity, opacity, hovertext in zip(
@@ -597,7 +597,7 @@ def _plot_three_relations_with_opacity(
         partition(3, z),
         intensities,
         opacities,
-        hovertexts,
+        # hovertexts,
     ):
         fig.add_trace(
             go.Mesh3d(
@@ -621,7 +621,7 @@ def _plot_three_relations_with_opacity(
                 ),
                 opacity=opacity,
                 hoverinfo="text",
-                hovertext=hovertext,
+                # hovertext=hovertext,
                 lighting=theme.lighting,
             )
         )
@@ -682,9 +682,12 @@ def plot_phi_structure(
         for direction in Direction.both()
     }
     # Group relations by degree
-    relations = defaultdict(ConcreteRelations)
+    relations = defaultdict(set)
+    phis = defaultdict(list)
     for relation in phi_structure.relations:
-        relations[len(relation)].add(relation)
+        for face in relation.faces:
+            relations[len(face)].add(face)
+            phis[len(face)].append(relation.phi)
 
     label = Labeler(subsystem)
 
@@ -734,11 +737,11 @@ def plot_phi_structure(
         fig, distinctions, cause_effect_link_coords, mechanism_mapping, theme
     )
 
-    def relation_to_coords(relation):
+    def face_to_coords(face):
         return np.array(
             [
                 purview_mapping[relatum.direction][relatum.purview]
-                for relatum in relation.relata
+                for relatum in face
             ]
         )
 
@@ -746,8 +749,9 @@ def plot_phi_structure(
     if relations[2]:
         _plot_two_relations(
             fig,
-            relation_to_coords,
+            face_to_coords,
             relations[2],
+            phis[2],
             label,
             theme,
         )
@@ -755,10 +759,10 @@ def plot_phi_structure(
     # 3-relations
     if relations[3]:
         if theme.three_relation_opacity_range is None:
-            _plot_three_relations(fig, relation_to_coords, relations[3], label, theme)
+            _plot_three_relations(fig, face_to_coords, relations[3], phis[3], label, theme)
         else:
             _plot_three_relations_with_opacity(
-                fig, relation_to_coords, relations[3], label, theme
+                fig, face_to_coords, relations[3], phis[3], label, theme
             )
 
     return fig
@@ -776,7 +780,6 @@ NODE_COLORS = {
     (True, 0): "lightblue",
     (True, 1): "darkblue",
 }
-
 
 def plot_graph(g, **kwargs):
     kwargs = {
