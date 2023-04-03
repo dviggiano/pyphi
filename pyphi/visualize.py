@@ -24,10 +24,7 @@ from .conf import config
 from .direction import Direction
 from .models.subsystem import CauseEffectStructure
 from .new_big_phi import PhiStructure
-from .relations import ConcreteRelations
 from .utils import state_of
-
-# TODO(viz): Update to use new relations
 
 
 def two_relation_face_type(relation_face):
@@ -57,7 +54,8 @@ class PhiPlotTheme:
     direction_offset: float = 0.5
     cause_color: str = "#e21a1a"
     effect_color: str = "#14b738"
-    point_size_range: tuple = (5, 30)
+    point_size: int = 5
+    # point_size_range: tuple = (5, 30)
     distinction_colorscale: str = "mint"
     distinction_opacity_range: tuple = (0.1, 0.9)
     line_width_range: tuple = (3, 10)
@@ -184,12 +182,16 @@ def spherical_to_cartesian(coords):
     )
 
 
-def regular_polygon(n, radius=1.0, center=(0, 0), z=0, angle=0):
+def regular_polygon(n, radius=1.0, center=(0, 0), z=0, angle=0, index=None):
     angles = (TWOPI / n) * np.arange(n) - angle
     points = np.empty([n, 3])
     points[:, 0] = center[0] + radius * np.sin(angles)
     points[:, 1] = center[1] + radius * np.cos(angles)
     points[:, 2] = z
+    
+    if index is not None:
+        return points[index]
+    
     return points
 
 
@@ -217,6 +219,40 @@ def linear(N):
 SHAPES = {"linear": linear, "log_n_choose_k": log_n_choose_k}
 
 
+# def powerset_coordinates(
+#     nodes,
+#     max_radius=1.0,
+#     aspect_ratio=0.5,
+#     z_offset=0.0,
+#     z_spacing=1.0,
+#     x_offset=0.0,
+#     radius_func=log_n_choose_k,
+# ):
+#     """Return a mapping from subsets of the nodes to coordinates."""
+#     radius_func = SHAPES.get(radius_func) or radius_func
+#     N = len(nodes)
+#     radii = radius_func(N)
+#     # Normalize overall radius
+#     radii = radii * max_radius / radii.max()
+#     z = aspect_ratio * max_radius * np.cumsum(np.ones(N) * z_spacing) + z_offset
+#     mapping = dict()
+#     for k in range(N):
+#         # TODO: sort?? order determines a lot about how the shape looks
+#         subsets = sorted(combinations(nodes, k + 1))
+#         mapping.update(
+#             dict(
+#                 zip(
+#                     subsets,
+#                     regular_polygon(
+#                         len(subsets),
+#                         radius=radii[k],
+#                         center=(x_offset, 0),
+#                         z=z[k],
+#                     ),
+#                 )
+#             )
+#         )
+#     return mapping
 def powerset_coordinates(
     nodes,
     max_radius=1.0,
@@ -235,21 +271,21 @@ def powerset_coordinates(
     z = aspect_ratio * max_radius * np.cumsum(np.ones(N) * z_spacing) + z_offset
     mapping = dict()
     for k in range(N):
-        # TODO: sort?? order determines a lot about how the shape looks
         subsets = sorted(combinations(nodes, k + 1))
-        mapping.update(
-            dict(
-                zip(
-                    subsets,
-                    regular_polygon(
-                        len(subsets),
-                        radius=radii[k],
-                        center=(x_offset, 0),
-                        z=z[k],
-                    ),
-                )
+        for i, subset in enumerate(subsets):
+            subset_order = len(subset)
+            z_coord = z_offset + (subset_order - 1) * z_spacing
+
+            coords = regular_polygon(
+                len(subsets),
+                radius=radii[k],
+                center=(x_offset, 0),
+                z=z_coord,
+                index=i
             )
-        )
+
+            mapping[subset] = coords
+
     return mapping
 
 
@@ -313,14 +349,14 @@ class Labeler:
     def relata(self, relata):
         return "<br>".join(map(self.mice, relata))
 
-    def relation(self, relation):
-        return f"{len(relation)}-relation<br>" + indent(
+    def relation_face(self, relation_face):
+        return f"{len(relation_face)}-relation<br>" + indent(
             "<br>".join(
                 [
-                    # f"P: {self.nodes(relation.purview)}", TODO fix this
-                    f"φ: {round(relation.phi, config.PRECISION)}",
+                    f"P: {self.nodes(relation_face.purview)}",
+                    f"φ: {round(relation_face.phi, config.PRECISION)}",
                     "Relata:",
-                    indent(self.relata(relation.relata)),
+                    indent(self.relata(relation_face.relata)),
                 ]
             )
         )
@@ -369,7 +405,7 @@ def _plot_distinctions(
         phis = np.array(list(_distinctions.phis))
         scaled_phis = rescale(phis, (0, 1))
         opacities = rescale(phis, theme.distinction_opacity_range)
-        marker_size = rescale(phis, theme.point_size_range)
+        marker_size = theme.point_size
         marker_colors = [
             rgb_to_rgba(get_color(theme.distinction_colorscale, loc), alpha=opacity)
             for loc, opacity in zip(scaled_phis, opacities)
@@ -527,8 +563,8 @@ def _plot_two_relation_faces(fig, relation_to_coords, relation_faces, phis, labe
                 line_color=line_color,
                 opacity=theme.two_relation_opacity,
                 line_width=width,
-                hoverinfo="text",
-                # hovertext=label.relation(relation_face),
+                # hoverinfo="text",
+                # hovertext=label.relation_face(relation_face),
                 # hoverlabel_font_color=theme.two_relations_hoverlabel_font_color,
             )
         )
@@ -548,7 +584,7 @@ def _plot_three_relation_faces(fig, relation_to_coords, relation_faces, phis, la
     i, j, k = np.tile(relata_indices, (3, 1)) + np.arange(3).reshape(3, 1)
     phis = np.array(phis)
     intensities = rescale(phis, theme.three_relation_intensity_range)
-    # hovertext = list(map(label.relation, relation_faces))
+    # hovertext = list(map(label.relation_face, relation_faces))
     fig.add_trace(
         go.Mesh3d(
             x=x,
@@ -571,7 +607,7 @@ def _plot_three_relation_faces(fig, relation_to_coords, relation_faces, phis, la
             ),
             opacity=theme.three_relation_opacity,
             lighting=theme.lighting,
-            hoverinfo="text",
+            # hoverinfo="text",
             # hovertext=hovertext,
         )
     )
@@ -588,7 +624,7 @@ def _plot_three_relation_faces_with_opacity(
     phis = np.array(phis)
     intensities = rescale(phis, theme.three_relation_intensity_range)
     opacities = rescale(phis, theme.three_relation_opacity_range)
-    # hovertexts = list(map(label.relation, relation_faces))
+    # hovertexts = list(map(label.relation_face, relation_faces))
     showlegend = theme.three_relation_showlegend
     showscale = theme.three_relation_showscale
     for _x, _y, _z, intensity, opacity, hovertext in zip(
@@ -620,7 +656,7 @@ def _plot_three_relation_faces_with_opacity(
                     len=1.0,
                 ),
                 opacity=opacity,
-                hoverinfo="text",
+                # hoverinfo="text",
                 # hovertext=hovertext,
                 lighting=theme.lighting,
             )
@@ -633,6 +669,10 @@ def _plot_three_relation_faces_with_opacity(
 # - 4-relations?
 # - think about configuration for visual attributes; seems it can be easily
 #   done post-hoc by user on the figure object
+# TODO
+# no phi bubbles around distinctions as default
+# plot purview labels: allow for choosing positions; not coord of vertex, rather top center...etc
+# first order, second order mechanisms 2 circles, z axis on a plane, distinctions surrounding it with the top one being the top order distinction etc.
 def plot_phi_structure(
     phi_structure,
     node_indices=None,
@@ -716,12 +756,12 @@ def plot_phi_structure(
     )
 
     # Cause-effect links
-    cause_effect_link_coords = _plot_cause_effect_links(
-        fig,
-        distinctions,
-        purview_mapping,
-        theme,
-    )
+    # cause_effect_link_coords = _plot_cause_effect_links(
+    #     fig,
+    #     distinctions,
+    #     purview_mapping,
+    #     theme,
+    # )
 
     mechanism_mapping = powerset_coordinates(
         node_indices,
@@ -733,9 +773,9 @@ def plot_phi_structure(
     # Mechanisms
     _plot_mechanisms(fig, distinctions, mechanism_mapping, label, theme)
     # Mechanism-purview links
-    _plot_mechanism_purview_links(
-        fig, distinctions, cause_effect_link_coords, mechanism_mapping, theme
-    )
+    # _plot_mechanism_purview_links(
+    #     fig, distinctions, cause_effect_link_coords, mechanism_mapping, theme
+    # )
 
     def face_to_coords(face):
         return np.array(
