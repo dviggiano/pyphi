@@ -28,7 +28,9 @@ def substate(
 
 def state_of(nodes, network_state):
     """Return the state-tuple of the given nodes."""
-    return tuple(network_state[n] for n in nodes) if nodes else ()
+    return tuple(
+        network_state[n.index if hasattr(n, 'index') else n] for n in nodes
+    ) if nodes else ()
 
 
 def state_of_subsystem_nodes(node_indices, nodes, subsystem_state):
