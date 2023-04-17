@@ -24,7 +24,6 @@ from .conf import config
 from .direction import Direction
 from .models.subsystem import CauseEffectStructure
 from .new_big_phi import PhiStructure
-from .relations import ConcreteRelations
 from .utils import state_of
 
 # TODO(viz): Update to use new relations
@@ -111,7 +110,6 @@ _TYPE_COLORS = {"isotext": "magenta", "inclusion": "indigo", "paratext": "cyan"}
 def type_color(relation_face):
     return _TYPE_COLORS[two_relation_face_type(relation_face)]
 
-
 TWO_RELATION_COLORSCHEMES = {"type": type_color}
 
 
@@ -145,6 +143,7 @@ def _get_color(colorscale, intermed):
         intermed=((intermed - low_cutoff) / (high_cutoff - low_cutoff)),
         colortype="rgb",
     )
+    
     return rgb_to_rgba(color)
 
 
@@ -542,7 +541,7 @@ def _plot_two_relation_faces(fig, relation_to_coords, relation_faces, label, the
         widths,
         line_colors,
     ):
-        x, y, z = relation_to_coords(face).transpose()
+        x, y, z = relation_to_coords(face).transpose()        
         fig.add_trace(
             go.Scatter3d(
                 x=x,
@@ -552,9 +551,9 @@ def _plot_two_relation_faces(fig, relation_to_coords, relation_faces, label, the
                 legendgroup=name + theme.legendgroup_postfix,
                 name=name,
                 mode="lines",
-                line_color=line_color,
                 opacity=theme.two_relation_opacity,
                 line_width=width,
+                line_color=[line_color],
                 hoverinfo="text",
                 # hovertext=label.relation(faces),
                 # hoverlabel_font_color=theme.two_relations_hoverlabel_font_color,
