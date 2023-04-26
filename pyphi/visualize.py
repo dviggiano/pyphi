@@ -37,7 +37,7 @@ def two_relation_face_type(relation_face):
         raise ValueError(f"must be a 2-relation; got a {len(relation_face)}-relation")
     purview = list(map(set, relation_face.relata_purviews))
     # Isotext (mutual full-overlap)
-    if purview[0] == purview[1] == relation_face.purview:
+    if purview[0] == relation_face.purview and purview[1] == relation_face.purview:
         return "isotext"
     # Sub/Supertext (inclusion / full-overlap)
     elif purview[0].issubset(purview[1]) or purview[0].issuperset(purview[1]):
