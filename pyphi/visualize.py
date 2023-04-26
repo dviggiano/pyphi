@@ -20,8 +20,7 @@ from plotly import graph_objs as go
 from toolz import partition
 
 import pyphi
-from pyphi.models.mechanism import Concept
-from pyphi.relations import Relation, RelationFace, Relations
+from pyphi.relations import Relation, RelationFace
 
 from .conf import config, fallback
 from .direction import Direction
