@@ -20,12 +20,12 @@ from plotly import graph_objs as go
 from toolz import partition
 
 import pyphi
-from pyphi.relations import Relation, RelationFace
 
 from .conf import config, fallback
 from .direction import Direction
 from .models.subsystem import CauseEffectStructure
 from .new_big_phi import PhiStructure
+from .relations import Relation, RelationFace
 from .utils import state_of
 
 # TODO(viz): Update to use new relations
