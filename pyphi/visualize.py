@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from itertools import combinations
 from math import cos, isclose, log2, radians, sin
+from numbers import Number
 from typing import Callable, Mapping, Optional, Union
 
 import networkx as nx
@@ -13,14 +14,14 @@ import plotly.colors
 import scipy.special
 import seaborn as sb
 from _plotly_utils.basevalidators import ColorscaleValidator
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, colors
 from numpy.typing import ArrayLike
 from plotly import graph_objs as go
 from toolz import partition
 
 import pyphi
 
-from .conf import config
+from .conf import config, fallback
 from .direction import Direction
 from .models.subsystem import CauseEffectStructure
 from .new_big_phi import PhiStructure
@@ -60,7 +61,7 @@ class PhiPlotTheme:
     point_size_range: tuple = (5, 30)
     distinction_colorscale: str = "mint"
     distinction_opacity_range: tuple = (0.1, 0.9)
-    line_width_range: tuple = (3, 10)
+    line_width_range: Union[tuple, float] = (3, 10)
     cause_effect_link_color: str = "lightgrey"
     cause_effect_link_opacity: float = 0.5
     mechanism_purview_link_color: str = "lightgrey"
@@ -71,6 +72,7 @@ class PhiPlotTheme:
     mechanism_radius_func: Union[Callable, str] = "linear"
     purview_radius_mod: float = 1.0
     two_relation_colorscale: Union[str, Callable, Mapping] = "type"
+    two_relation_intensity_range: Union[tuple, float] = (0, 1)
     two_relation_opacity: float = 0.2
     two_relations_hoverlabel_font_color: str = "white"
     three_relation_colorscale: str = "teal"
@@ -85,6 +87,26 @@ class PhiPlotTheme:
         )
     )
     legendgroup_postfix: str = ""
+    plot_distinctions: bool = True
+    plot_cause_effect_links: bool = True
+    plot_mechanisms: bool = True
+    plot_mechanism_purview_links: bool = True
+    plot_labels: bool = True
+    plot_two_relation_faces: bool = True
+    plot_three_relation_faces: bool = True
+    
+    def __post_init__(self):
+        if isinstance(self.line_width_range, Number):
+            width_range = max(0, min(self.line_width_range, 1))
+            self.line_width_range = (7 - width_range * 3, 7 + width_range * 3)
+            
+        if isinstance(self.two_relation_intensity_range, Number):
+            intensity_range = max(0, min(self.two_relation_intensity_range, 1))
+            self.two_relation_intensity_range = (0.5 - intensity_range / 2, 0.5 + intensity_range / 2)
+            
+        if isinstance(self.three_relation_intensity_range, Number):
+            intensity_range = max(0, min(self.three_relation_intensity_range, 1))
+            self.three_relation_intensity_range = (0.5 - intensity_range / 2, 0.5 + intensity_range / 2)
 
 
 GREYS = PhiPlotTheme(
@@ -119,7 +141,6 @@ def rgb_to_rgba(color, alpha=0):
     channels = tuple(round(c, 7) for c in channels)
     channels += (alpha,)
     return f"rgba{channels}"
-
 
 def _get_color(colorscale, intermed):
     if len(colorscale) < 1:
@@ -383,11 +404,13 @@ def _plot_distinctions(
             _distinctions.append(distinction.mice(direction))
             purview = distinction.purview(direction)
             coords.append(purview_mapping[direction][purview])
-            labels.append(label.nodes(purview))
+            if labels is not None:
+                labels.append(label.nodes(purview))
 
         _distinctions = CauseEffectStructure(_distinctions)
-        hovertext = [label.hover(distinction) for distinction in _distinctions]
-        text = [label.mice(distinction) for distinction in _distinctions]
+        if labels is not None:
+            hovertext = [label.hover(distinction) for distinction in _distinctions]
+            text = [label.mice(distinction) for distinction in _distinctions]
         phis = np.array(list(_distinctions.phis))
         scaled_phis = rescale(phis, (0, 1))
         opacities = rescale(phis, theme.distinction_opacity_range)
@@ -421,9 +444,10 @@ def _plot_cause_effect_links(
 ):
     # TODO make this scaling consistent with 2-relation phi?
     name = "Cause-effect links" + theme.legendgroup_postfix
-    widths = rescale(np.array(list(distinctions.phis)), theme.line_width_range)
     showlegend = True
-    link_coords = []
+    link_coords = []        
+    widths = rescale(np.array(list(distinctions.phis)), theme.line_width_range)
+    
     for distinction, width in zip(distinctions, widths):
         coords = np.stack(
             [
@@ -457,7 +481,8 @@ def _plot_mechanisms(fig, distinctions, mechanism_mapping, label, theme):
     labels = []
     coords = []
     for mechanism in distinctions.mechanisms:
-        labels.append(label.nodes(mechanism))
+        if label is not None:
+            labels.append(label.nodes(mechanism))
         coords.append(mechanism_mapping[mechanism])
     fig.add_trace(
         scatter_from_coords(
@@ -475,9 +500,9 @@ def _plot_mechanism_purview_links(
     fig, distinctions, cause_effect_link_coords, mechanism_mapping, theme
 ):
     name = "Mechanism-purview links" + theme.legendgroup_postfix
-    # TODO make this scaling consistent with 2-relation phi?
-    widths = rescale(np.array(list(distinctions.phis)), theme.line_width_range)
     showlegend = True
+    # TODO make this scaling consistent with 2-relation phi?        
+    widths = rescale(np.array(list(distinctions.phis)), theme.line_width_range)
     for distinction, width, coords in zip(
         distinctions, widths, cause_effect_link_coords
     ):
@@ -506,8 +531,8 @@ def _plot_mechanism_purview_links(
 def _plot_two_relation_faces(fig, relation_to_coords, relation_faces, label, theme):
     name = "2-relations" + theme.legendgroup_postfix
     phis = np.array(list(phi for _, phi in relation_faces))
+    faces = [face for face, _ in relation_faces]    
     widths = rescale(phis, theme.line_width_range)
-    faces = [face for face, _ in relation_faces]
 
     if isinstance(theme.two_relation_colorscale, Mapping):
         # Map to relation type
@@ -521,11 +546,14 @@ def _plot_two_relation_faces(fig, relation_to_coords, relation_faces, label, the
         isinstance(theme.two_relation_colorscale, str)
         and theme.two_relation_colorscale not in TWO_RELATION_COLORSCHEMES
     ):
-        # Plotly colorscale
-        scaled_phis = rescale(phis, (0, 1))
-        line_colors = [
-            get_color(theme.two_relation_colorscale, phi) for phi in scaled_phis
-        ]
+        if colors.is_color_like(theme.two_relation_colorscale):
+            line_colors = [theme.two_relation_colorscale] * len(faces)
+        else:           
+            # Plotly colorscale                
+            scaled_phis = rescale(phis, theme.two_relation_intensity_range)
+            line_colors = [
+                get_color(theme.two_relation_colorscale, phi) for phi in scaled_phis
+            ]
     elif theme.two_relation_colorscale in TWO_RELATION_COLORSCHEMES:
         # Library function
         line_colors = list(
@@ -534,6 +562,8 @@ def _plot_two_relation_faces(fig, relation_to_coords, relation_faces, label, the
     else:
         # Callable
         line_colors = list(map(theme.two_relation_colorscale, faces))
+        
+    # hovertext = label.relation(faces) if label else None
 
     showlegend = True
     for face, width, line_color in zip(
@@ -555,7 +585,7 @@ def _plot_two_relation_faces(fig, relation_to_coords, relation_faces, label, the
                 line_width=width,
                 line_color=[line_color],
                 hoverinfo="text",
-                # hovertext=label.relation(faces),
+                # hovertext=hovertext,
                 # hoverlabel_font_color=theme.two_relations_hoverlabel_font_color,
             )
         )
@@ -577,7 +607,12 @@ def _plot_three_relation_faces(fig, relation_to_coords, relation_faces, label, t
     i, j, k = np.tile(relata_indices, (3, 1)) + np.arange(3).reshape(3, 1)
     phis = np.array(list(phi for _, phi in relation_faces))
     intensities = rescale(phis, theme.three_relation_intensity_range)
-    # hovertext = list(map(label.relation, relation_faces))
+    # hovertext = list(map(label.relation, relation_faces)) if label else None
+    if colors.is_color_like(theme.three_relation_colorscale):
+        colorscale = [theme.three_relation_colorscale] * len(relation_faces)
+    else:
+        colorscale = theme.three_relation_colorscale
+    
     fig.add_trace(
         go.Mesh3d(
             x=x,
@@ -591,7 +626,7 @@ def _plot_three_relation_faces(fig, relation_to_coords, relation_faces, label, t
             name=name,
             intensity=intensities,
             intensitymode="cell",
-            colorscale=theme.three_relation_colorscale,
+            colorscale=colorscale,
             showscale=theme.three_relation_showscale,
             colorbar=dict(
                 title=dict(text="φ", font_size=2 * theme.fontsize),
@@ -619,9 +654,15 @@ def _plot_three_relation_faces_with_opacity(
     phis = np.array(list(phi for _, phi in relation_faces))
     intensities = rescale(phis, theme.three_relation_intensity_range)
     opacities = rescale(phis, theme.three_relation_opacity_range)
-    # hovertexts = list(map(label.relation, relation_faces))
+    # hovertexts = list(map(label.relation, relation_faces)) if label else None
     showlegend = theme.three_relation_showlegend
     showscale = theme.three_relation_showscale
+    
+    if colors.is_color_like(theme.three_relation_colorscale):
+        colorscale = [theme.three_relation_colorscale] * len(relation_faces)
+    else:
+        colorscale = theme.three_relation_colorscale
+        
     for _x, _y, _z, intensity, opacity in zip(
         partition(3, x),
         partition(3, y),
@@ -643,7 +684,7 @@ def _plot_three_relation_faces_with_opacity(
                 name=name,
                 intensity=[intensity],
                 intensitymode="cell",
-                colorscale=theme.three_relation_colorscale,
+                colorscale=colorscale,
                 showscale=showscale,
                 colorbar=dict(
                     title=dict(text="φ", font_size=2 * theme.fontsize),
@@ -671,6 +712,14 @@ def plot_phi_structure(
     shape="log_n_choose_k",
     theme=None,
     system_size=None,
+    plot_distinctions=None,
+    plot_cause_effect_links=None,
+    plot_mechanisms=None,
+    plot_mechanism_purview_links=None,
+    plot_two_relation_faces=None,
+    plot_three_relation_faces=None,
+    plot_labels=None,
+    faces=None,
 ):
     """Plot a PhiStructure.
 
@@ -689,9 +738,17 @@ def plot_phi_structure(
         )
     if not phi_structure.distinctions:
         raise ValueError("No distinctions; cannot plot")
-
+    
     if theme is None:
         theme = PhiPlotTheme()
+        
+    plot_distinctions = fallback(plot_distinctions, theme.plot_distinctions)
+    plot_cause_effect_links = fallback(plot_cause_effect_links, theme.plot_cause_effect_links)
+    plot_mechanisms = fallback(plot_mechanisms, theme.plot_mechanisms)
+    plot_mechanism_purview_links = fallback(plot_mechanism_purview_links, theme.plot_mechanism_purview_links)
+    plot_two_relation_faces = fallback(plot_two_relation_faces, theme.plot_two_relation_faces)
+    plot_three_relation_faces = fallback(plot_three_relation_faces, theme.plot_three_relation_faces)
+    plot_labels = fallback(plot_labels, theme.plot_labels)
 
     if fig is None:
         fig = go.Figure()
@@ -705,7 +762,7 @@ def plot_phi_structure(
     if node_indices is None:
         node_indices = subsystem.node_indices
 
-    label = Labeler(subsystem)
+    label = Labeler(subsystem) if plot_labels else None
 
     # x offsets for causes and effects
     direction_offset = dict(
@@ -756,69 +813,79 @@ def plot_phi_structure(
     }
 
     # Distinctions
-    _plot_distinctions(
-        fig,
-        distinctions,
-        purview_mapping_base,
-        label,
-        theme,
-    )
-
-    # Cause-effect links
-    cause_effect_link_coords = _plot_cause_effect_links(
-        fig,
-        distinctions,
-        purview_mapping_base,
-        theme,
-    )
-
-    mechanism_mapping = powerset_coordinates(
-        node_indices,
-        max_radius=theme.mechanism_max_radius,
-        z_offset=theme.mechanism_z_offset,
-        z_spacing=theme.mechanism_z_spacing,
-        radius_func=theme.mechanism_radius_func,
-        # purview_radius_mod=1,
-    )
-    # Mechanisms
-    _plot_mechanisms(fig, distinctions, mechanism_mapping, label, theme)
-    # Mechanism-purview links
-    _plot_mechanism_purview_links(
-        fig, distinctions, cause_effect_link_coords, mechanism_mapping, theme
-    )
-
-    # Group relations by degree
-    relations = defaultdict(set)
-    for relation in phi_structure.relations:
-        for face in relation.faces:
-            relations[len(face)].add((face, relation.phi))
-
-    def face_to_coords(face):
-        return np.array(
-            [
-                purview_mapping[relatum.direction][relatum.mechanism][relatum.purview]
-                for relatum in face
-            ]
-        )
-
-    # 2-relations
-    if relations[2]:
-        _plot_two_relation_faces(
+    if plot_distinctions:
+        _plot_distinctions(
             fig,
-            face_to_coords,
-            relations[2],
+            distinctions,
+            purview_mapping_base,
             label,
             theme,
         )
 
-    # 3-relations
-    if relations[3]:
-        if theme.three_relation_opacity_range is None:
-            _plot_three_relation_faces(fig, face_to_coords, relations[3], label, theme)
-        else:
-            _plot_three_relation_faces_with_opacity(
-                fig, face_to_coords, relations[3], label, theme
+    # Cause-effect links
+    if plot_cause_effect_links:
+        cause_effect_link_coords = _plot_cause_effect_links(
+            fig,
+            distinctions,
+            purview_mapping_base,
+            theme,
+        )
+
+    if plot_mechanisms:
+        mechanism_mapping = powerset_coordinates(
+            node_indices,
+            max_radius=theme.mechanism_max_radius,
+            z_offset=theme.mechanism_z_offset,
+            z_spacing=theme.mechanism_z_spacing,
+            radius_func=theme.mechanism_radius_func,
+            # purview_radius_mod=1,
+        )
+        # Mechanisms
+        _plot_mechanisms(fig, distinctions, mechanism_mapping, label, theme)
+        # Mechanism-purview links
+        if theme.plot_mechanism_purview_links and plot_mechanism_purview_links:
+            _plot_mechanism_purview_links(
+                fig, distinctions, cause_effect_link_coords, mechanism_mapping, theme
             )
+
+    if plot_two_relation_faces or plot_three_relation_faces:
+        # Group relations by degree
+        relations = defaultdict(set)
+        
+        if faces is None: # user can provide specific faces to plot
+            for relation in phi_structure.relations:
+                for face in relation.faces:
+                    relations[len(face)].add((face, relation.phi))
+        else:
+            for face in faces:
+                relations[len(face)].add((face, relation.phi))
+
+        def face_to_coords(face):
+            return np.array(
+                [
+                    purview_mapping[relatum.direction][relatum.mechanism][relatum.purview]
+                    for relatum in face
+                ]
+            )
+
+        # 2-relations
+        if relations[2] and plot_two_relation_faces:
+            _plot_two_relation_faces(
+                fig,
+                face_to_coords,
+                relations[2],
+                label,
+                theme,
+            )
+
+        # 3-relations
+        if relations[3] and plot_three_relation_faces:
+            if theme.three_relation_opacity_range is None:
+                _plot_three_relation_faces(fig, face_to_coords, relations[3], label, theme)
+            else:
+                _plot_three_relation_faces_with_opacity(
+                    fig, face_to_coords, relations[3], label, theme
+                )
 
     return fig
 
