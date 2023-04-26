@@ -78,7 +78,7 @@ class PhiPlotTheme:
     three_relation_colorscale: str = "teal"
     three_relation_opacity: float = 0.1
     three_relation_opacity_range: Optional[tuple] = None
-    three_relation_intensity_range: tuple = (0, 1)
+    three_relation_intensity_range: Union[tuple, float] = (0, 1)
     three_relation_showlegend: bool = True
     three_relation_showscale: bool = True
     lighting: Mapping = field(
