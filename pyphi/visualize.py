@@ -20,6 +20,8 @@ from plotly import graph_objs as go
 from toolz import partition
 
 import pyphi
+from pyphi.models.mechanism import Concept
+from pyphi.relations import Relation, RelationFace, Relations
 
 from .conf import config, fallback
 from .direction import Direction
@@ -712,14 +714,15 @@ def plot_phi_structure(
     shape="log_n_choose_k",
     theme=None,
     system_size=None,
-    plot_distinctions=None,
-    plot_cause_effect_links=None,
-    plot_mechanisms=None,
-    plot_mechanism_purview_links=None,
-    plot_two_relation_faces=None,
-    plot_three_relation_faces=None,
-    plot_labels=None,
-    faces=None,
+    plot_distinctions: bool = None,
+    plot_cause_effect_links: bool = None,
+    plot_mechanisms: bool = None,
+    plot_mechanism_purview_links: bool = None,
+    plot_two_relation_faces: bool = None,
+    plot_three_relation_faces: bool = None,
+    plot_labels: bool = None,
+    relations: Iterable[Relation] = None,
+    faces: Iterable[RelationFace] = None,
 ):
     """Plot a PhiStructure.
 
@@ -730,7 +733,26 @@ def plot_phi_structure(
             structure; specifically, how the radii scale with purview order. Can
             be the name of an existing function in the SHAPES dictionary, or a
             user-supplied function.
-        plot_mechanisms (bool): Whether to plot mechanisms.
+        theme (PhiPlotTheme): The theme to use. Defaults to None, 
+            which creates a new theme.
+        plot_distinctions (bool): Whether to plot distinctions. 
+            Defaults to theme, which defaults to True.
+        plot_cause_effect_links (bool): Whether to plot cause-effect links. 
+            Defaults to theme, which defaults to True.
+        plot_mechanisms (bool): Whether to plot mechanisms. 
+            Defaults to theme, which defaults to True.
+        plot_mechanism_purview_links (bool): Whether to plot mechanism purview links. 
+            Defaults to theme, which defaults to True.
+        plot_two_relation_faces (bool): Whether to plot two-relation faces. 
+            Defaults to theme, which defaults to True.
+        plot_three_relation_faces (bool): Whether to plot three-relation faces. 
+            Defaults to theme, which defaults to True.
+        plot_labels (bool): Whether to plot labels. 
+            Defaults to theme, which defaults to True.
+        relations (Relations | Iterable[Relation]): The relations to plot.
+            Defaults to all relations in the structure.
+        faces (Iterable[RelationFace]): The relation faces to plot.
+            Defaults to all relation faces in the structure.
     """
     if not isinstance(phi_structure, PhiStructure):
         raise ValueError(
@@ -742,6 +764,7 @@ def plot_phi_structure(
     if theme is None:
         theme = PhiPlotTheme()
         
+    # fall back to theme
     plot_distinctions = fallback(plot_distinctions, theme.plot_distinctions)
     plot_cause_effect_links = fallback(plot_cause_effect_links, theme.plot_cause_effect_links)
     plot_mechanisms = fallback(plot_mechanisms, theme.plot_mechanisms)
@@ -749,6 +772,7 @@ def plot_phi_structure(
     plot_two_relation_faces = fallback(plot_two_relation_faces, theme.plot_two_relation_faces)
     plot_three_relation_faces = fallback(plot_three_relation_faces, theme.plot_three_relation_faces)
     plot_labels = fallback(plot_labels, theme.plot_labels)
+    provided_relations = fallback(relations, phi_structure.relations)
 
     if fig is None:
         fig = go.Figure()
@@ -853,7 +877,7 @@ def plot_phi_structure(
         relations = defaultdict(set)
         
         if faces is None: # user can provide specific faces to plot
-            for relation in phi_structure.relations:
+            for relation in provided_relations:
                 for face in relation.faces:
                     relations[len(face)].add((face, relation.phi))
         else:
